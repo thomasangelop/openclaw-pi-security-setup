@@ -330,7 +330,8 @@ test_docker_breakout() {
   else
     # Check docker-compose config instead
     COMPOSE_FILE="/opt/openclaw/docker-compose.yml"
-    if [[ -f "$COMPOSE_FILE" ]] && grep -q "docker.sock" "$COMPOSE_FILE"; then
+    # Exclude comment lines so the "Do NOT mount docker.sock" warning comment doesn't trigger a false positive
+    if [[ -f "$COMPOSE_FILE" ]] && grep -v "^[[:space:]]*#" "$COMPOSE_FILE" | grep -q "docker.sock"; then
       test_fail "3.1 Docker socket not mounted" \
         "docker.sock found in docker-compose.yml volumes" \
         "Remove the /var/run/docker.sock mount from docker-compose.yml"
