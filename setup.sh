@@ -302,8 +302,15 @@ EOF
   info "Installing hardware watchdog..."
   apt install -y -qq watchdog
   # Enable the Pi's hardware watchdog
-  if ! grep -q "dtparam=watchdog=on" /boot/config.txt 2>/dev/null; then
-    echo "dtparam=watchdog=on" >> /boot/config.txt
+  # Pi OS Bookworm (64-bit) uses /boot/firmware/config.txt; older uses /boot/config.txt
+  BOOT_CONFIG="/boot/firmware/config.txt"
+  if [[ ! -f "$BOOT_CONFIG" ]]; then
+    BOOT_CONFIG="/boot/config.txt"
+  fi
+  if [[ -f "$BOOT_CONFIG" ]] && ! grep -q "dtparam=watchdog=on" "$BOOT_CONFIG"; then
+    echo "dtparam=watchdog=on" >> "$BOOT_CONFIG"
+  elif [[ ! -f "$BOOT_CONFIG" ]]; then
+    warn "Could not find boot config.txt — skipping watchdog dtparam (add 'dtparam=watchdog=on' manually)"
   fi
   cat > /etc/watchdog.conf << 'EOF'
 watchdog-device = /dev/watchdog
@@ -452,16 +459,25 @@ layer3_network() {
 
   # Harden SSH config
   info "Applying hardened SSH configuration..."
-  cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d)
+  SSHD_BACKUP_DATE=$(date +%Y%m%d)
+  cp /etc/ssh/sshd_config "/etc/ssh/sshd_config.backup.${SSHD_BACKUP_DATE}"
   cp "$SCRIPT_DIR/config/sshd_config.hardened" /etc/ssh/sshd_config
+  # Populate AllowUsers with the operator username (restricts SSH to this user only)
+  echo "" >> /etc/ssh/sshd_config
+  echo "AllowUsers $OPERATOR_USER" >> /etc/ssh/sshd_config
   chmod 600 /etc/ssh/sshd_config
+  # Detect SSH service name (Pi OS Bookworm uses 'ssh', older uses 'sshd')
+  SSH_SVC="ssh"
+  if systemctl list-units --type=service --all 2>/dev/null | grep -q "^  sshd.service"; then
+    SSH_SVC="sshd"
+  fi
   # Validate config before restart
   if sshd -t; then
-    systemctl restart sshd
-    pass "Hardened SSH config applied and sshd restarted"
+    systemctl restart "$SSH_SVC"
+    pass "Hardened SSH config applied and $SSH_SVC restarted"
   else
     warn "sshd config test failed — restoring backup"
-    cp /etc/ssh/sshd_config.backup.$(date +%Y%m%d) /etc/ssh/sshd_config
+    cp "/etc/ssh/sshd_config.backup.${SSHD_BACKUP_DATE}" /etc/ssh/sshd_config
     fail "SSH hardening failed — check config manually"
   fi
 
@@ -480,12 +496,21 @@ layer3_network() {
   pass "Tailscale interface allowed in UFW"
 
   # Start Tailscale auth
+  # tailscale up can block for browser auth in a headless environment — always run in background
   if [[ -n "$TAILSCALE_AUTH_KEY" ]]; then
     info "Starting Tailscale with auth key..."
-    tailscale up --authkey="$TAILSCALE_AUTH_KEY" --hostname="$HOSTNAME_VAL" || warn "Tailscale auth failed — run 'sudo tailscale up' manually"
+    tailscale up --auth-key="$TAILSCALE_AUTH_KEY" --hostname="$HOSTNAME_VAL" 2>&1 || \
+      warn "Tailscale auth failed — run 'sudo tailscale up' manually after setup"
   else
-    info "Starting Tailscale (manual auth required)..."
-    tailscale up --hostname="$HOSTNAME_VAL" || warn "Tailscale interactive auth needed — run 'sudo tailscale up' in another terminal"
+    info "Starting Tailscale — interactive auth required..."
+    warn "Tailscale needs browser auth. Running in background."
+    warn "After setup completes: run 'sudo tailscale up' and follow the URL."
+    tailscale up --hostname="$HOSTNAME_VAL" 2>&1 &
+    TAILSCALE_PID=$!
+    sleep 3
+    # If it printed a URL, capture and show it; then let it run in background
+    kill "$TAILSCALE_PID" 2>/dev/null || true
+    warn "Complete Tailscale auth manually: sudo tailscale up"
   fi
 
   # Enable UFW

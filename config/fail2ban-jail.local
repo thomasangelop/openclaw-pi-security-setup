@@ -26,7 +26,10 @@ banaction = iptables-multiport
 enabled  = true
 port     = ssh
 filter   = sshd
-logpath  = /var/log/auth.log
+# Pi OS Bookworm (Debian 12) uses systemd journal — no /var/log/auth.log by default.
+# 'backend = systemd' makes fail2ban read from journald directly.
+# If you have /var/log/auth.log (rsyslog installed), you can switch to backend = auto.
+backend  = systemd
 maxretry = 3
 bantime  = 3600
 findtime = 600

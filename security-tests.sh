@@ -15,8 +15,6 @@
 set -uo pipefail
 IFS=$'\n\t'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # =============================================================================
 # Colors & Counters
 # =============================================================================
@@ -166,13 +164,20 @@ test_ssh_bruteforce() {
 
   # 1.7 Verify jail config maxretry
   if [[ -f /etc/fail2ban/jail.local ]]; then
-    MAX_RETRY=$(grep -A10 "^\[sshd\]" /etc/fail2ban/jail.local 2>/dev/null | grep "maxretry" | head -1 | awk -F= '{print $2}' | xargs)
+    MAX_RETRY=$(grep -A15 "^\[sshd\]" /etc/fail2ban/jail.local 2>/dev/null | grep "^maxretry" | head -1 | awk -F= '{print $2}' | xargs)
     if [[ -n "$MAX_RETRY" && "$MAX_RETRY" -le 3 ]]; then
       test_pass "1.7 Fail2Ban maxretry = $MAX_RETRY (≤ 3)"
     else
       test_fail "1.7 Fail2Ban maxretry" \
         "Current: ${MAX_RETRY:-not set} (should be ≤ 3)" \
         "Set maxretry = 3 in [sshd] section of /etc/fail2ban/jail.local"
+    fi
+    # Check systemd backend for Pi OS Bookworm compatibility
+    if grep -A15 "^\[sshd\]" /etc/fail2ban/jail.local 2>/dev/null | grep -q "backend.*systemd"; then
+      test_pass "1.7b Fail2Ban systemd backend configured (Pi OS Bookworm compatible)"
+    else
+      test_skip "1.7b Fail2Ban systemd backend" \
+        "not configured — may still work if /var/log/auth.log exists via rsyslog"
     fi
   else
     test_fail "1.7 Fail2Ban maxretry configured" \
