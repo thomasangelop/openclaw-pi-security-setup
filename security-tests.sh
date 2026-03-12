@@ -223,12 +223,12 @@ test_firewall_egress() {
   fi
 
   # 2.3 Verify default deny outgoing
-  if echo "$UFW_STATUS" | grep -q "Default: deny (outgoing)"; then
+  if echo "$UFW_STATUS" | grep -q "deny (outgoing)"; then
     test_pass "2.3 Default deny outgoing"
   else
     test_fail "2.3 Default deny outgoing" \
       "UFW default outgoing is not deny" \
-      "Run: sudo ufw default deny outgoing"
+      "Run: sudo ufw default deny outgoing && sudo ufw reload"
   fi
 
   # 2.4 Test non-whitelisted egress port 80 is blocked
@@ -242,13 +242,22 @@ test_firewall_egress() {
   fi
 
   # 2.5 Test whitelisted DNS works
+  # Use multiple fallbacks — nslookup/host may not be installed on Pi OS Lite
   echo "       [→] Testing DNS resolution (should succeed)..."
-  if nslookup google.com 8.8.8.8 &>/dev/null || host google.com &>/dev/null; then
+  if nslookup google.com 8.8.8.8 &>/dev/null 2>&1; then
+    test_pass "2.5 DNS resolution works (port 53 whitelisted)"
+  elif host google.com &>/dev/null 2>&1; then
+    test_pass "2.5 DNS resolution works (port 53 whitelisted)"
+  elif dig +short google.com &>/dev/null 2>&1; then
+    test_pass "2.5 DNS resolution works (port 53 whitelisted)"
+  elif getent hosts google.com &>/dev/null 2>&1; then
+    test_pass "2.5 DNS resolution works (port 53 whitelisted)"
+  elif python3 -c "import socket; socket.gethostbyname('google.com')" &>/dev/null 2>&1; then
     test_pass "2.5 DNS resolution works (port 53 whitelisted)"
   else
     test_fail "2.5 DNS resolution" \
-      "DNS lookup failed — port 53 may not be whitelisted" \
-      "Run: sudo ufw allow out to any port 53"
+      "DNS lookup failed — port 53 may not be whitelisted or resolver is down" \
+      "Run: sudo ufw allow out to any port 53 && sudo ufw reload"
   fi
 
   # 2.6 Test whitelisted HTTPS works
