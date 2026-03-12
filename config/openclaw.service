@@ -1,0 +1,69 @@
+# Systemd service unit for OpenClaw AI Agent (host mode)
+# Applied by setup.sh to /etc/systemd/system/openclaw.service
+# Source: OpenClaw Security Checklist — Layer 5
+
+[Unit]
+Description=OpenClaw AI Agent
+Documentation=https://docs.openclaw.ai/gateway/security
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=openclaw
+Group=openclaw
+WorkingDirectory=/opt/openclaw
+
+# Load environment variables from .env (chmod 600)
+EnvironmentFile=/opt/openclaw/config/.env
+
+ExecStart=/usr/local/bin/openclaw start --config /opt/openclaw/config/openclaw.json
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openclaw
+
+# ---- Security Hardening ----
+# No privilege escalation
+NoNewPrivileges=true
+
+# Protect system directories as read-only
+ProtectSystem=strict
+
+# No access to home directories
+ProtectHome=true
+
+# Private /tmp — not shared with other services
+PrivateTmp=true
+
+# Allow writes only to workspace and logs
+ReadWritePaths=/opt/openclaw/workspace /opt/openclaw/logs
+
+# Private /dev — no raw device access
+PrivateDevices=true
+
+# Restrict network namespaces
+RestrictNamespaces=true
+
+# Restrict address families
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# No real-time scheduling
+RestrictRealtime=true
+
+# Restrict setuid/setgid bits
+RestrictSUIDSGID=true
+
+# Lock down syscall filter (basic)
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Prevent memory being made executable
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

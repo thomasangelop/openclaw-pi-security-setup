@@ -1,0 +1,46 @@
+# Secrets and credentials — NEVER commit these
+*.env
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*secret*
+*credential*
+*credentials*
+setup.conf
+*.conf.local
+
+# OpenClaw config with real tokens
+openclaw.json
+!openclaw.json.template
+
+# Logs
+*.log
+logs/
+
+# Runtime artifacts
+*.pid
+*.sock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V*
+.Trashes
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.bak
+*.backup

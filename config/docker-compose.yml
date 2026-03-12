@@ -1,0 +1,82 @@
+---
+# Docker Compose for OpenClaw AI Agent — hardened deployment
+# Used by setup.sh in Docker mode
+# Source: OpenClaw Security Checklist — Layer 2
+
+services:
+  openclaw:
+    image: openclaw/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+
+    # ---- Resource limits (Pi 5 — leaves headroom for OS) ----
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4g
+        reservations:
+          cpus: "0.5"
+          memory: 512m
+
+    pids_limit: 100
+
+    # ---- Security hardening ----
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Add back only what openclaw actually needs:
+    # cap_add:
+    #   - NET_BIND_SERVICE   # only if binding to port <1024
+
+    user: "1000:1000"
+
+    # ---- Filesystem mounts ----
+    volumes:
+      # Workspace: read-only — agent should not write here by default
+      - /opt/openclaw/workspace:/workspace:ro
+      # Config: read-only mount (openclaw.json)
+      - /opt/openclaw/config/openclaw.json:/config/openclaw.json:ro
+      # Logs: writable
+      - /opt/openclaw/logs:/logs:rw
+
+    # Writable tmpfs for /tmp — noexec prevents script execution
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+
+    # ---- Network ----
+    # Bind only to localhost — never expose directly to network
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    # ---- Environment ----
+    env_file:
+      - /opt/openclaw/config/.env
+
+    # ---- Health check ----
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # ---- Logging ----
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    # ---- Labels ----
+    labels:
+      - "description=OpenClaw AI Agent — hardened Pi 5 deployment"
+      - "security.profile=openclaw-pi-hardened"
+
+# NOTE: Do NOT add Docker socket mount (/var/run/docker.sock)
+# NOTE: Do NOT mount home directory or any path outside /opt/openclaw
+# NOTE: The DOCKER-USER iptables chain (applied by setup.sh) blocks
+#       new external connections from reaching published ports — UFW
+#       alone is insufficient for Docker port security.

@@ -1,0 +1,42 @@
+# Fail2Ban jail configuration for OpenClaw Pi
+# Applied by setup.sh to /etc/fail2ban/jail.local
+# Source: OpenClaw Security Checklist — Layer 3
+
+[DEFAULT]
+# Ban hosts for 1 hour
+bantime  = 3600
+
+# Scan the last 10 minutes for failures
+findtime = 600
+
+# Allow 3 retries before ban
+maxretry = 3
+
+# Send email alerts (configure if you have an MTA)
+# destemail = your@email.com
+# sendername = Fail2Ban-OpenClaw-Pi
+# mta = sendmail
+# action = %(action_mwl)s
+
+# Use iptables-multiport for banning
+banaction = iptables-multiport
+
+# ---- SSH Jail ----
+[sshd]
+enabled  = true
+port     = ssh
+filter   = sshd
+logpath  = /var/log/auth.log
+maxretry = 3
+bantime  = 3600
+findtime = 600
+
+# ---- Optional: tighter repeat-offender ban ----
+# Uncomment to progressively increase ban time for repeat offenders
+# [sshd-ddos]
+# enabled  = true
+# port     = ssh
+# filter   = sshd-ddos
+# logpath  = /var/log/auth.log
+# maxretry = 2
+# bantime  = 86400

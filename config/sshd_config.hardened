@@ -1,0 +1,60 @@
+# Hardened SSH configuration for OpenClaw Pi
+# Applied by setup.sh to /etc/ssh/sshd_config
+# Source: OpenClaw Security Checklist — Layer 3
+
+# ---- Authentication ----
+PasswordAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+UsePAM yes
+
+# Limit auth attempts
+MaxAuthTries 3
+MaxSessions 5
+LoginGraceTime 30
+
+# ---- Users ----
+# Only allow the openclaw operator user for SSH
+# Uncomment and set your username after setup:
+# AllowUsers YOUR_USERNAME
+
+# ---- Network ----
+# Listen on default port (change to non-standard for obscurity if desired)
+Port 22
+
+# Disable X11 and TCP forwarding unless needed
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+GatewayPorts no
+
+# ---- Idle timeout ----
+# Disconnect idle sessions after 15 minutes
+ClientAliveInterval 300
+ClientAliveCountMax 3
+
+# ---- Logging ----
+LogLevel VERBOSE
+SyslogFacility AUTH
+
+# ---- Protocol & Ciphers ----
+Protocol 2
+
+# Strong key exchange algorithms only
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512
+
+# Strong ciphers only
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+
+# Strong MACs only
+MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com
+
+# ---- Subsystems ----
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+# ---- Miscellaneous ----
+PrintMotd no
+AcceptEnv LANG LC_*
